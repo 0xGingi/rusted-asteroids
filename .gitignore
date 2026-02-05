@@ -1,0 +1,25 @@
+# Build artifacts
+/target/
+debug/
+release/
+
+# Cargo
+**/*.rs.bk
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
