@@ -14,7 +14,6 @@ use shared::{
 };
 
 const TICK_HZ: u32 = 20;
-const ROT_SPEED: f32 = 5.0;
 const THRUST: f32 = 12.0;
 const DRAG: f32 = 0.985;
 const MAX_SPEED: f32 = 25.0;
@@ -444,7 +443,11 @@ fn tick(s: &mut ServerState, dt: f32) {
 
         // Update angle and velocity
         let player = s.players.get_mut(&id).unwrap();
-        player.angle += input.rotate as f32 * ROT_SPEED * dt;
+
+        // 8-way directional: snap to target angle if provided
+        if let Some(target) = input.target_angle {
+            player.angle = target;
+        }
 
         let thrust_mult = if has_speed { SPEED_BOOST_MULT } else { 1.0 };
         if input.thrust {

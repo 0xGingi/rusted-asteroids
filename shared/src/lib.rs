@@ -57,7 +57,8 @@ impl Vec2 {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PlayerInput {
     pub thrust: bool,
-    pub rotate: i8,
+    #[serde(default)]
+    pub target_angle: Option<f32>,
     pub fire: bool,
 }
 

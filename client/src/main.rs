@@ -24,14 +24,17 @@ use shared::{
 use shared::{Vec2, WORLD_HEIGHT, WORLD_WIDTH};
 
 struct InputState {
-    thrust: bool,
-    rotate_left: bool,
-    rotate_right: bool,
+    // 8-way directional movement
+    up: bool,
+    down: bool,
+    left: bool,
+    right: bool,
     fire: bool,
     // Per-key timestamps for timeout (needed on macOS which lacks key release events)
-    thrust_at: Option<Instant>,
-    rotate_left_at: Option<Instant>,
-    rotate_right_at: Option<Instant>,
+    up_at: Option<Instant>,
+    down_at: Option<Instant>,
+    left_at: Option<Instant>,
+    right_at: Option<Instant>,
     fire_at: Option<Instant>,
 }
 
@@ -40,13 +43,15 @@ const INPUT_TIMEOUT_MS: u64 = 120;
 impl Default for InputState {
     fn default() -> Self {
         Self {
-            thrust: false,
-            rotate_left: false,
-            rotate_right: false,
+            up: false,
+            down: false,
+            left: false,
+            right: false,
             fire: false,
-            thrust_at: None,
-            rotate_left_at: None,
-            rotate_right_at: None,
+            up_at: None,
+            down_at: None,
+            left_at: None,
+            right_at: None,
             fire_at: None,
         }
     }
@@ -54,13 +59,15 @@ impl Default for InputState {
 
 impl InputState {
     fn clear(&mut self) {
-        self.thrust = false;
-        self.rotate_left = false;
-        self.rotate_right = false;
+        self.up = false;
+        self.down = false;
+        self.left = false;
+        self.right = false;
         self.fire = false;
-        self.thrust_at = None;
-        self.rotate_left_at = None;
-        self.rotate_right_at = None;
+        self.up_at = None;
+        self.down_at = None;
+        self.left_at = None;
+        self.right_at = None;
         self.fire_at = None;
     }
 
@@ -68,22 +75,28 @@ impl InputState {
         let timeout = Duration::from_millis(INPUT_TIMEOUT_MS);
         let now = Instant::now();
 
-        if let Some(t) = self.thrust_at {
+        if let Some(t) = self.up_at {
             if now.duration_since(t) > timeout {
-                self.thrust = false;
-                self.thrust_at = None;
+                self.up = false;
+                self.up_at = None;
             }
         }
-        if let Some(t) = self.rotate_left_at {
+        if let Some(t) = self.down_at {
             if now.duration_since(t) > timeout {
-                self.rotate_left = false;
-                self.rotate_left_at = None;
+                self.down = false;
+                self.down_at = None;
             }
         }
-        if let Some(t) = self.rotate_right_at {
+        if let Some(t) = self.left_at {
             if now.duration_since(t) > timeout {
-                self.rotate_right = false;
-                self.rotate_right_at = None;
+                self.left = false;
+                self.left_at = None;
+            }
+        }
+        if let Some(t) = self.right_at {
+            if now.duration_since(t) > timeout {
+                self.right = false;
+                self.right_at = None;
             }
         }
         if let Some(t) = self.fire_at {
@@ -92,6 +105,20 @@ impl InputState {
                 self.fire_at = None;
             }
         }
+    }
+
+    /// Returns (thrust, rotate) based on 8-way input
+    /// rotate: direction to face (-1 left, 0 none, 1 right), thrust: whether moving
+    fn to_direction(&self) -> Option<f32> {
+        let dx = (self.right as i8) - (self.left as i8);
+        let dy = (self.down as i8) - (self.up as i8);
+
+        if dx == 0 && dy == 0 {
+            return None;
+        }
+
+        // Calculate angle: right=0, down=PI/2, left=PI, up=-PI/2
+        Some((dy as f32).atan2(dx as f32))
     }
 }
 
@@ -219,18 +246,23 @@ fn build_input(input: &mut InputState) -> PlayerInput {
     // On platforms without Release events (macOS), auto-clear after timeout
     input.check_timeout();
 
-    let rotate = if input.rotate_left && !input.rotate_right {
-        -1
-    } else if input.rotate_right && !input.rotate_left {
-        1
-    } else {
-        0
-    };
+    // 8-way directional: compute target angle from WASD
+    if let Some(angle) = input.to_direction() {
+        // Snap to 8 directions for consistency
+        let sector = ((angle + std::f32::consts::FRAC_PI_8) / std::f32::consts::FRAC_PI_4).floor();
+        let snapped = sector * std::f32::consts::FRAC_PI_4;
 
-    PlayerInput {
-        thrust: input.thrust,
-        rotate,
-        fire: input.fire,
+        PlayerInput {
+            thrust: true,
+            target_angle: Some(snapped),
+            fire: input.fire,
+        }
+    } else {
+        PlayerInput {
+            thrust: false,
+            target_angle: None,
+            fire: input.fire,
+        }
     }
 }
 
@@ -337,29 +369,38 @@ fn handle_game_key(state: &mut ClientState, key: crossterm::event::KeyEvent) -> 
     match key.code {
         KeyCode::Char('w') | KeyCode::Up => {
             if key.kind == KeyEventKind::Release {
-                state.input.thrust = false;
-                state.input.thrust_at = None;
+                state.input.up = false;
+                state.input.up_at = None;
             } else {
-                state.input.thrust = true;
-                state.input.thrust_at = Some(now);
+                state.input.up = true;
+                state.input.up_at = Some(now);
+            }
+        }
+        KeyCode::Char('s') | KeyCode::Down => {
+            if key.kind == KeyEventKind::Release {
+                state.input.down = false;
+                state.input.down_at = None;
+            } else {
+                state.input.down = true;
+                state.input.down_at = Some(now);
             }
         }
         KeyCode::Char('a') | KeyCode::Left => {
             if key.kind == KeyEventKind::Release {
-                state.input.rotate_left = false;
-                state.input.rotate_left_at = None;
+                state.input.left = false;
+                state.input.left_at = None;
             } else {
-                state.input.rotate_left = true;
-                state.input.rotate_left_at = Some(now);
+                state.input.left = true;
+                state.input.left_at = Some(now);
             }
         }
         KeyCode::Char('d') | KeyCode::Right => {
             if key.kind == KeyEventKind::Release {
-                state.input.rotate_right = false;
-                state.input.rotate_right_at = None;
+                state.input.right = false;
+                state.input.right_at = None;
             } else {
-                state.input.rotate_right = true;
-                state.input.rotate_right_at = Some(now);
+                state.input.right = true;
+                state.input.right_at = Some(now);
             }
         }
         KeyCode::Char(' ') => {

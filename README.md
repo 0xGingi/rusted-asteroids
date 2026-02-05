@@ -96,9 +96,11 @@ ASTEROIDS_ADDR=0.0.0.0:4000 ./server
 
 | Key | Action |
 |-----|--------|
-| `W` / `Up Arrow` | Thrust forward |
-| `A` / `Left Arrow` | Rotate left |
-| `D` / `Right Arrow` | Rotate right |
+| `W` / `Up Arrow` | Move up |
+| `S` / `Down Arrow` | Move down |
+| `A` / `Left Arrow` | Move left |
+| `D` / `Right Arrow` | Move right |
+| `W+A`, `W+D`, etc. | Move diagonally (8-way) |
 | `Space` | Fire |
 | `C` | Enter chat mode |
 | `Esc` | Exit chat mode |
