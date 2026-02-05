@@ -28,10 +28,14 @@ struct InputState {
     rotate_left: bool,
     rotate_right: bool,
     fire: bool,
-    last_event: Instant,
+    // Per-key timestamps for timeout (needed on macOS which lacks key release events)
+    thrust_at: Option<Instant>,
+    rotate_left_at: Option<Instant>,
+    rotate_right_at: Option<Instant>,
+    fire_at: Option<Instant>,
 }
 
-const INPUT_TIMEOUT_MS: u64 = 80;
+const INPUT_TIMEOUT_MS: u64 = 120;
 
 impl Default for InputState {
     fn default() -> Self {
@@ -40,7 +44,10 @@ impl Default for InputState {
             rotate_left: false,
             rotate_right: false,
             fire: false,
-            last_event: Instant::now(),
+            thrust_at: None,
+            rotate_left_at: None,
+            rotate_right_at: None,
+            fire_at: None,
         }
     }
 }
@@ -51,14 +58,39 @@ impl InputState {
         self.rotate_left = false;
         self.rotate_right = false;
         self.fire = false;
+        self.thrust_at = None;
+        self.rotate_left_at = None;
+        self.rotate_right_at = None;
+        self.fire_at = None;
     }
 
     fn check_timeout(&mut self) {
-        if self.last_event.elapsed() > Duration::from_millis(INPUT_TIMEOUT_MS) {
-            self.thrust = false;
-            self.rotate_left = false;
-            self.rotate_right = false;
-            self.fire = false;
+        let timeout = Duration::from_millis(INPUT_TIMEOUT_MS);
+        let now = Instant::now();
+
+        if let Some(t) = self.thrust_at {
+            if now.duration_since(t) > timeout {
+                self.thrust = false;
+                self.thrust_at = None;
+            }
+        }
+        if let Some(t) = self.rotate_left_at {
+            if now.duration_since(t) > timeout {
+                self.rotate_left = false;
+                self.rotate_left_at = None;
+            }
+        }
+        if let Some(t) = self.rotate_right_at {
+            if now.duration_since(t) > timeout {
+                self.rotate_right = false;
+                self.rotate_right_at = None;
+            }
+        }
+        if let Some(t) = self.fire_at {
+            if now.duration_since(t) > timeout {
+                self.fire = false;
+                self.fire_at = None;
+            }
         }
     }
 }
@@ -143,7 +175,7 @@ async fn main() -> Result<()> {
     let mut tui = Tui::new()?;
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<Event>();
     tokio::task::spawn_blocking(move || loop {
-        if event::poll(Duration::from_millis(50)).unwrap_or(false) {
+        if event::poll(Duration::from_millis(5)).unwrap_or(false) {
             if let Ok(ev) = event::read() {
                 let _ = event_tx.send(ev);
             }
@@ -301,37 +333,42 @@ fn handle_game_key(state: &mut ClientState, key: crossterm::event::KeyEvent) -> 
         return Ok(());
     }
 
+    let now = Instant::now();
     match key.code {
         KeyCode::Char('w') | KeyCode::Up => {
             if key.kind == KeyEventKind::Release {
                 state.input.thrust = false;
+                state.input.thrust_at = None;
             } else {
                 state.input.thrust = true;
-                state.input.last_event = Instant::now();
+                state.input.thrust_at = Some(now);
             }
         }
         KeyCode::Char('a') | KeyCode::Left => {
             if key.kind == KeyEventKind::Release {
                 state.input.rotate_left = false;
+                state.input.rotate_left_at = None;
             } else {
                 state.input.rotate_left = true;
-                state.input.last_event = Instant::now();
+                state.input.rotate_left_at = Some(now);
             }
         }
         KeyCode::Char('d') | KeyCode::Right => {
             if key.kind == KeyEventKind::Release {
                 state.input.rotate_right = false;
+                state.input.rotate_right_at = None;
             } else {
                 state.input.rotate_right = true;
-                state.input.last_event = Instant::now();
+                state.input.rotate_right_at = Some(now);
             }
         }
         KeyCode::Char(' ') => {
             if key.kind == KeyEventKind::Release {
                 state.input.fire = false;
+                state.input.fire_at = None;
             } else {
                 state.input.fire = true;
-                state.input.last_event = Instant::now();
+                state.input.fire_at = Some(now);
             }
         }
         _ => {}
