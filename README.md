@@ -31,7 +31,7 @@ Download the latest release for your platform from the [Releases](../../releases
 Requires [Rust](https://rustup.rs/) 1.70 or later.
 
 ```bash
-git clone https://github.com/yourusername/rusted-asteroids.git
+git clone https://github.com/0xGingi/rusted-asteroids.git
 cd rusted-asteroids
 cargo build --release
 ```
